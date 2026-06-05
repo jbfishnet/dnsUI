@@ -10,5 +10,5 @@ class DnsEntry(BaseModel):
 class DhcpLease(BaseModel):
     mac: str
     ip: str
-    hostname: str
+    hostname: str = ""  # optional — dnsmasq allows dhcp-host=mac,ip without a name
     id: str | None = None  # generated from mac

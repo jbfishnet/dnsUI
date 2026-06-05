@@ -8,14 +8,21 @@ SAMPLE_CONF = """\
 # dnsmasq configuration
 domain-needed
 bogus-priv
+interface=eth0  # network interface
 
 address=/router.local/192.168.1.1
 address=/nas.local/192.168.1.50
 
+# Static DHCP lease with hostname
 dhcp-host=aa:bb:cc:dd:ee:ff,192.168.1.100,laptop
-dhcp-host=11:22:33:44:55:66,192.168.1.101,desktop
+# Static DHCP lease without hostname (real-world format)
+dhcp-host=11:22:33:44:55:66,192.168.1.101
+# Uppercase MAC (real-world format)
+dhcp-host=AA:BB:CC:DD:EE:11,192.168.1.102,desktop
 
 dhcp-range=192.168.1.100,192.168.1.200,12h
+dhcp-option=3,192.168.1.1
+dhcp-option=6,192.168.1.1
 """
 
 

@@ -27,10 +27,11 @@ def test_list_dhcp_returns_leases(conf_path):
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
-    assert len(data) == 2
+    assert len(data) == 3
     macs = {l["mac"] for l in data}
     assert "aa:bb:cc:dd:ee:ff" in macs
     assert "11:22:33:44:55:66" in macs
+    assert "AA:BB:CC:DD:EE:11" in macs
 
 
 def test_list_dhcp_lease_has_id(conf_path):
@@ -45,6 +46,20 @@ def test_list_dhcp_lease_fields(conf_path):
     lease = next(l for l in resp.json() if l["mac"] == "aa:bb:cc:dd:ee:ff")
     assert lease["ip"] == "192.168.1.100"
     assert lease["hostname"] == "laptop"
+
+
+def test_list_dhcp_lease_without_hostname(conf_path):
+    resp = client.get("/api/dhcp")
+    lease = next(l for l in resp.json() if l["mac"] == "11:22:33:44:55:66")
+    assert lease["ip"] == "192.168.1.101"
+    assert lease["hostname"] == ""
+
+
+def test_list_dhcp_lease_uppercase_mac(conf_path):
+    resp = client.get("/api/dhcp")
+    lease = next(l for l in resp.json() if l["mac"] == "AA:BB:CC:DD:EE:11")
+    assert lease["ip"] == "192.168.1.102"
+    assert lease["hostname"] == "desktop"
 
 
 # ---------------------------------------------------------------------------

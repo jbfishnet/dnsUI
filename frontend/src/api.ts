@@ -1,4 +1,6 @@
-const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8000";
+// Default to "" (relative) so nginx proxies /api/* to the backend.
+// Override with VITE_API_URL at build time for standalone dev (e.g. VITE_API_URL=http://localhost:8000).
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
 
 export interface DnsEntry {
   id: string;
