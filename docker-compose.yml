@@ -1,14 +1,12 @@
-version: '3.8'
-
 services:
   backend:
     build: ./backend
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-9124}:8000"
+    pid: host
+    privileged: true
     volumes:
       - /etc/dnsmasq.conf:/etc/dnsmasq.conf
-      - /run/systemd/private:/run/systemd/private
-      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
     environment:
       - DNSMASQ_CONF=/etc/dnsmasq.conf
     restart: unless-stopped
@@ -16,7 +14,8 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "80:80"
+      - "${HTTPS_PORT:-9123}:443"
+      - "${HTTP_PORT:-9180}:80"
     depends_on:
       - backend
     restart: unless-stopped

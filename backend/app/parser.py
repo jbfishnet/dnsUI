@@ -54,7 +54,10 @@ def read_config(path: str) -> List[str]:
 
 _DNS_RE = re.compile(r"^address=/([^/]+)/([^/\s]+)\s*$")
 _DHCP_RE = re.compile(
-    r"^dhcp-host=([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}),([^,\s]+),([^,\s]+)\s*$"
+    r"^dhcp-host=([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})"
+    r",([^,\s]+)"
+    r"(?:,([^,\s]+))?"  # hostname is optional (dnsmasq allows mac,ip without name)
+    r"\s*$"
 )
 
 
@@ -75,7 +78,8 @@ def parse_dhcp_leases(lines: List[str]) -> List[DhcpLease]:
     for line in lines:
         m = _DHCP_RE.match(line.strip())
         if m:
-            mac, ip, hostname = m.group(1), m.group(2), m.group(3)
+            mac, ip = m.group(1), m.group(2)
+            hostname = m.group(3) or ""
             leases.append(
                 DhcpLease(mac=mac, ip=ip, hostname=hostname, id=dhcp_id(mac))
             )
@@ -122,7 +126,10 @@ def write_config(
     for entry in dns_entries:
         managed.append(f"address=/{entry.hostname}/{entry.ip}")
     for lease in dhcp_leases:
-        managed.append(f"dhcp-host={lease.mac},{lease.ip},{lease.hostname}")
+        if lease.hostname:
+            managed.append(f"dhcp-host={lease.mac},{lease.ip},{lease.hostname}")
+        else:
+            managed.append(f"dhcp-host={lease.mac},{lease.ip}")
 
     if managed:
         if parts:

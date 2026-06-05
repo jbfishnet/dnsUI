@@ -98,7 +98,9 @@ export default function DhcpTable() {
                 <tr key={lease.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-mono text-gray-800">{lease.mac}</td>
                   <td className="px-4 py-3 font-mono text-gray-600">{lease.ip}</td>
-                  <td className="px-4 py-3 text-gray-700">{lease.hostname}</td>
+                  <td className="px-4 py-3 text-gray-700">
+                    {lease.hostname || <span className="text-gray-400 italic">—</span>}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">
                       <button

@@ -7,6 +7,7 @@ import DnsTable from "../components/DnsTable";
 vi.mock("../api", () => ({
   listDns: vi.fn(),
   createDns: vi.fn(),
+  createDnsBulk: vi.fn(),
   updateDns: vi.fn(),
   deleteDns: vi.fn(),
 }));
@@ -71,7 +72,7 @@ describe("DnsTable", () => {
     expect(screen.getByDisplayValue("192.168.1.1")).toBeInTheDocument();
   });
 
-  it("calls createDns and reloads on form submit", async () => {
+  it("calls createDns for a single hostname on form submit", async () => {
     vi.mocked(api.createDns).mockResolvedValue({
       id: "new-local",
       hostname: "new.local",
@@ -89,19 +90,46 @@ describe("DnsTable", () => {
     await waitFor(() => screen.getByText("router.local"));
 
     await userEvent.click(screen.getByRole("button", { name: /Add/i }));
-    await userEvent.clear(screen.getByLabelText("Hostname"));
-    await userEvent.type(screen.getByLabelText("Hostname"), "new.local");
+    const hostnameField = screen.getByLabelText("Hostname(s)");
+    await userEvent.clear(hostnameField);
+    await userEvent.type(hostnameField, "new.local");
     await userEvent.clear(screen.getByLabelText("IP Address"));
     await userEvent.type(screen.getByLabelText("IP Address"), "10.0.0.1");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
-      expect(api.createDns).toHaveBeenCalledWith({
-        hostname: "new.local",
-        ip: "10.0.0.1",
-      });
+      expect(api.createDns).toHaveBeenCalledWith({ hostname: "new.local", ip: "10.0.0.1" });
     });
     await waitFor(() => screen.getByText("new.local"));
+  });
+
+  it("calls createDnsBulk for multiple hostnames on form submit", async () => {
+    const bulkResult = [
+      { id: "producer-test", hostname: "producer.test", ip: "192.168.1.22" },
+      { id: "consumer-test", hostname: "consumer.test", ip: "192.168.1.22" },
+    ];
+    vi.mocked(api.createDnsBulk).mockResolvedValue(bulkResult);
+    vi.mocked(api.listDns)
+      .mockResolvedValueOnce(MOCK_ENTRIES)
+      .mockResolvedValueOnce([...MOCK_ENTRIES, ...bulkResult]);
+
+    render(<DnsTable />);
+    await waitFor(() => screen.getByText("router.local"));
+
+    await userEvent.click(screen.getByRole("button", { name: /Add/i }));
+    const hostnameField = screen.getByLabelText("Hostname(s)");
+    await userEvent.clear(hostnameField);
+    await userEvent.type(hostnameField, "producer.test consumer.test");
+    await userEvent.clear(screen.getByLabelText("IP Address"));
+    await userEvent.type(screen.getByLabelText("IP Address"), "192.168.1.22");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(api.createDnsBulk).toHaveBeenCalledWith(
+        ["producer.test", "consumer.test"],
+        "192.168.1.22"
+      );
+    });
   });
 
   it("calls updateDns on edit form submit", async () => {

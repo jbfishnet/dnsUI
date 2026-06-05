@@ -1,4 +1,6 @@
-const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8000";
+// Default to "" (relative) so nginx proxies /api/* to the backend.
+// Override with VITE_API_URL at build time for standalone dev (e.g. VITE_API_URL=http://localhost:8000).
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
 
 export interface DnsEntry {
   id: string;
@@ -39,6 +41,9 @@ export const updateDns = (id: string, entry: Omit<DnsEntry, "id">): Promise<DnsE
 export const deleteDns = (id: string): Promise<void> =>
   request<void>(`/api/dns/${id}`, { method: "DELETE" });
 
+export const createDnsBulk = (hostnames: string[], ip: string): Promise<DnsEntry[]> =>
+  request<DnsEntry[]>("/api/dns/bulk", { method: "POST", body: JSON.stringify({ hostnames, ip }) });
+
 // DHCP
 export const listDhcp = (): Promise<DhcpLease[]> =>
   request<DhcpLease[]>("/api/dhcp");
@@ -51,3 +56,13 @@ export const updateDhcp = (id: string, lease: Omit<DhcpLease, "id">): Promise<Dh
 
 export const deleteDhcp = (id: string): Promise<void> =>
   request<void>(`/api/dhcp/${id}`, { method: "DELETE" });
+
+// Service
+export type ServiceStatus = "active" | "inactive" | "failed" | "unknown";
+export type ServiceAction = "start" | "stop" | "restart";
+
+export const getServiceStatus = (): Promise<{ status: ServiceStatus }> =>
+  request<{ status: ServiceStatus }>("/api/service/status");
+
+export const runServiceAction = (action: ServiceAction): Promise<{ status: string }> =>
+  request<{ status: string }>(`/api/service/${action}`, { method: "POST" });
