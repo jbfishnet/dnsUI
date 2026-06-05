@@ -4,12 +4,34 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
 
 permissions:
   contents: write
   packages: write
 
 jobs:
+  # ── Resolve version ────────────────────────────────────────────────────────
+  # Makes ${{ needs.version.outputs.tag }} available to all downstream jobs.
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      - id: v
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "tag=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
   # ── Run the full test suite first ──────────────────────────────────────────
   test-backend:
     name: Backend tests (Python 3.11)
@@ -42,8 +64,8 @@ jobs:
 
   # ── Build & push Docker images to GHCR ─────────────────────────────────────
   docker-publish:
-    name: Publish Docker images
-    needs: [test-backend, test-frontend]
+    name: Publish Docker images (${{ matrix.service }})
+    needs: [version, test-backend, test-frontend]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -64,16 +86,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ matrix.image }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -82,54 +94,66 @@ jobs:
         with:
           context: ${{ matrix.context }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ matrix.image }}:${{ needs.version.outputs.tag }}
+            ${{ matrix.image }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   # ── Create GitHub Release ───────────────────────────────────────────────────
   github-release:
     name: Create GitHub Release
-    needs: [docker-publish]
+    needs: [version, docker-publish]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Create git tag (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ needs.version.outputs.tag }}"
+          git push origin "${{ needs.version.outputs.tag }}"
+
       - name: Generate release notes
         id: notes
         run: |
-          # Collect commits since the previous tag (or all if first release)
-          PREV_TAG=$(git tag --sort=-creatordate | sed -n '2p' || echo "")
+          VERSION="${{ needs.version.outputs.tag }}"
+          PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${VERSION}$" | head -1 || echo "")
           if [[ -n "$PREV_TAG" ]]; then
             LOG=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s" --no-merges)
           else
             LOG=$(git log --pretty=format:"- %s" --no-merges | head -30)
           fi
-          echo "RELEASE_NOTES<<EOF" >> "$GITHUB_OUTPUT"
-          echo "## What's changed" >> "$GITHUB_OUTPUT"
-          echo "" >> "$GITHUB_OUTPUT"
-          echo "$LOG" >> "$GITHUB_OUTPUT"
-          echo "" >> "$GITHUB_OUTPUT"
-          echo "## Docker images" >> "$GITHUB_OUTPUT"
-          echo "" >> "$GITHUB_OUTPUT"
-          echo '```' >> "$GITHUB_OUTPUT"
-          echo "ghcr.io/${{ github.repository_owner }}/dnsui-backend:${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-          echo "ghcr.io/${{ github.repository_owner }}/dnsui-frontend:${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-          echo '```' >> "$GITHUB_OUTPUT"
-          echo "" >> "$GITHUB_OUTPUT"
-          echo "## One-line install" >> "$GITHUB_OUTPUT"
-          echo "" >> "$GITHUB_OUTPUT"
-          echo '```bash' >> "$GITHUB_OUTPUT"
-          echo "curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash" >> "$GITHUB_OUTPUT"
-          echo '```' >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          {
+            echo "RELEASE_NOTES<<EOF"
+            echo "## What's changed"
+            echo ""
+            echo "$LOG"
+            echo ""
+            echo "## Docker images"
+            echo ""
+            echo '```'
+            echo "ghcr.io/${{ github.repository_owner }}/dnsui-backend:${VERSION}"
+            echo "ghcr.io/${{ github.repository_owner }}/dnsui-frontend:${VERSION}"
+            echo '```'
+            echo ""
+            echo "## One-line install"
+            echo ""
+            echo '```bash'
+            echo "curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash"
+            echo '```'
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          name: "dnsmasq Manager ${{ github.ref_name }}"
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: "dnsmasq Manager ${{ needs.version.outputs.tag }}"
           body: ${{ steps.notes.outputs.RELEASE_NOTES }}
           files: install.sh
           generate_release_notes: false
