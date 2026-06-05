@@ -7,8 +7,12 @@ ServiceStatus = Literal["active", "inactive", "failed", "unknown"]
 
 
 def _systemctl(*args: str) -> subprocess.CompletedProcess[str]:
+    # nsenter -t 1 enters the host's namespaces (PID 1 = host init), so
+    # systemctl runs in the host's mount/PID context and can reach systemd
+    # without needing a dbus socket inside the container.
     return subprocess.run(
-        ["systemctl", *args, "dnsmasq"],
+        ["nsenter", "-t", "1", "-m", "-u", "-i", "-n", "-p", "--",
+         "systemctl", *args, "dnsmasq"],
         capture_output=True,
         text=True,
     )

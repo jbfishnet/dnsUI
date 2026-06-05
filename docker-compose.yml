@@ -3,10 +3,9 @@ services:
     build: ./backend
     ports:
       - "${BACKEND_PORT:-9124}:8000"
+    pid: host
     volumes:
       - /etc/dnsmasq.conf:/etc/dnsmasq.conf
-      - /run/systemd:/run/systemd
-      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
     environment:
       - DNSMASQ_CONF=/etc/dnsmasq.conf
     restart: unless-stopped
