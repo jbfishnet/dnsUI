@@ -4,6 +4,7 @@ services:
     ports:
       - "${BACKEND_PORT:-9124}:8000"
     pid: host
+    privileged: true
     volumes:
       - /etc/dnsmasq.conf:/etc/dnsmasq.conf
     environment:
