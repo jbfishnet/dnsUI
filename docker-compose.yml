@@ -5,7 +5,7 @@ services:
       - "${BACKEND_PORT:-9124}:8000"
     volumes:
       - /etc/dnsmasq.conf:/etc/dnsmasq.conf
-      - /run/systemd/private:/run/systemd/private
+      - /run/systemd:/run/systemd
       - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
     environment:
       - DNSMASQ_CONF=/etc/dnsmasq.conf

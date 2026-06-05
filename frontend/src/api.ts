@@ -56,3 +56,13 @@ export const updateDhcp = (id: string, lease: Omit<DhcpLease, "id">): Promise<Dh
 
 export const deleteDhcp = (id: string): Promise<void> =>
   request<void>(`/api/dhcp/${id}`, { method: "DELETE" });
+
+// Service
+export type ServiceStatus = "active" | "inactive" | "failed" | "unknown";
+export type ServiceAction = "start" | "stop" | "restart";
+
+export const getServiceStatus = (): Promise<{ status: ServiceStatus }> =>
+  request<{ status: ServiceStatus }>("/api/service/status");
+
+export const runServiceAction = (action: ServiceAction): Promise<{ status: string }> =>
+  request<{ status: string }>(`/api/service/${action}`, { method: "POST" });

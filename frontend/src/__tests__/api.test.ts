@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   listDns, createDns, createDnsBulk, updateDns, deleteDns,
   listDhcp, createDhcp, updateDhcp, deleteDhcp,
+  getServiceStatus, runServiceAction,
 } from "../api";
 
 const DNS_ENTRIES = [
@@ -189,5 +190,79 @@ describe("deleteDhcp", () => {
     expect(fetch).toHaveBeenCalledWith("/api/dhcp/aa-bb-cc-dd-ee-ff", expect.objectContaining({
       method: "DELETE",
     }));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Service control
+// ---------------------------------------------------------------------------
+
+describe("getServiceStatus", () => {
+  it("calls GET /api/service/status", async () => {
+    mockFetch({ status: "active" });
+    await getServiceStatus();
+    expect(fetch).toHaveBeenCalledWith("/api/service/status", expect.objectContaining({
+      headers: expect.objectContaining({ "Content-Type": "application/json" }),
+    }));
+  });
+
+  it("returns the status object", async () => {
+    mockFetch({ status: "active" });
+    const result = await getServiceStatus();
+    expect(result).toEqual({ status: "active" });
+  });
+
+  it("returns inactive status", async () => {
+    mockFetch({ status: "inactive" });
+    const result = await getServiceStatus();
+    expect(result.status).toBe("inactive");
+  });
+
+  it("returns failed status", async () => {
+    mockFetch({ status: "failed" });
+    const result = await getServiceStatus();
+    expect(result.status).toBe("failed");
+  });
+
+  it("throws on network error (non-2xx)", async () => {
+    mockFetch({ detail: "Internal error" }, 500);
+    await expect(getServiceStatus()).rejects.toThrow();
+  });
+});
+
+describe("runServiceAction", () => {
+  it("calls POST /api/service/start", async () => {
+    mockFetch({ status: "started", service: "dnsmasq" });
+    await runServiceAction("start");
+    expect(fetch).toHaveBeenCalledWith("/api/service/start", expect.objectContaining({
+      method: "POST",
+    }));
+  });
+
+  it("calls POST /api/service/stop", async () => {
+    mockFetch({ status: "stopped", service: "dnsmasq" });
+    await runServiceAction("stop");
+    expect(fetch).toHaveBeenCalledWith("/api/service/stop", expect.objectContaining({
+      method: "POST",
+    }));
+  });
+
+  it("calls POST /api/service/restart", async () => {
+    mockFetch({ status: "restarted", service: "dnsmasq" });
+    await runServiceAction("restart");
+    expect(fetch).toHaveBeenCalledWith("/api/service/restart", expect.objectContaining({
+      method: "POST",
+    }));
+  });
+
+  it("returns the response body", async () => {
+    mockFetch({ status: "restarted", service: "dnsmasq" });
+    const result = await runServiceAction("restart");
+    expect(result).toEqual({ status: "restarted", service: "dnsmasq" });
+  });
+
+  it("throws on 500 when systemctl fails", async () => {
+    mockFetch({ detail: "systemctl restart dnsmasq failed" }, 500);
+    await expect(runServiceAction("restart")).rejects.toThrow();
   });
 });
