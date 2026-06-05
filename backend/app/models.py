@@ -7,6 +7,11 @@ class DnsEntry(BaseModel):
     id: str | None = None  # generated from hostname
 
 
+class BulkDnsCreate(BaseModel):
+    hostnames: list[str]
+    ip: str
+
+
 class DhcpLease(BaseModel):
     mac: str
     ip: str

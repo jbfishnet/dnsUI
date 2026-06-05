@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
-  listDns, createDns, updateDns, deleteDns,
+  listDns, createDns, createDnsBulk, updateDns, deleteDns,
   listDhcp, createDhcp, updateDhcp, deleteDhcp,
 } from "../api";
 
@@ -81,6 +81,27 @@ describe("updateDns", () => {
   it("throws on 404", async () => {
     mockFetch({ detail: "Not found" }, 404);
     await expect(updateDns("ghost", { hostname: "x", ip: "1.2.3.4" })).rejects.toThrow();
+  });
+});
+
+describe("createDnsBulk", () => {
+  it("calls POST /api/dns/bulk with hostnames array and ip", async () => {
+    const created = [
+      { id: "producer-hamq-test", hostname: "producer.hamq.test", ip: "192.168.1.22" },
+      { id: "consumer-hamq-test", hostname: "consumer.hamq.test", ip: "192.168.1.22" },
+    ];
+    mockFetch(created, 201);
+    const result = await createDnsBulk(["producer.hamq.test", "consumer.hamq.test"], "192.168.1.22");
+    expect(fetch).toHaveBeenCalledWith("/api/dns/bulk", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ hostnames: ["producer.hamq.test", "consumer.hamq.test"], ip: "192.168.1.22" }),
+    }));
+    expect(result).toHaveLength(2);
+  });
+
+  it("throws on 409 when a hostname already exists", async () => {
+    mockFetch({ detail: "DNS entry for 'router.local' already exists" }, 409);
+    await expect(createDnsBulk(["router.local"], "10.0.0.1")).rejects.toThrow();
   });
 });
 

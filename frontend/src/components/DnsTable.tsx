@@ -1,9 +1,22 @@
 import { useState, useEffect, useCallback } from "react";
-import { DnsEntry, listDns, createDns, updateDns, deleteDns } from "../api";
+import { DnsEntry, listDns, createDns, createDnsBulk, updateDns, deleteDns } from "../api";
 import EntryModal, { FieldConfig } from "./EntryModal";
 import Toast from "./Toast";
 
-const DNS_FIELDS: FieldConfig[] = [
+// Add mode: multiline hostname field so the user can paste multiple names at once
+const DNS_ADD_FIELDS: FieldConfig[] = [
+  {
+    name: "hostnames",
+    label: "Hostname(s)",
+    placeholder: "producer.hamq.test\nconsumer.hamq.test\narbiter.hamq.test",
+    multiline: true,
+    hint: "One hostname per line, or space-separated. All will be mapped to the IP below.",
+  },
+  { name: "ip", label: "IP Address", placeholder: "192.168.1.100" },
+];
+
+// Edit mode: single hostname only
+const DNS_EDIT_FIELDS: FieldConfig[] = [
   { name: "hostname", label: "Hostname", placeholder: "mydevice.local" },
   { name: "ip", label: "IP Address", placeholder: "192.168.1.100" },
 ];
@@ -34,8 +47,17 @@ export default function DnsTable() {
   }
 
   async function handleCreate(values: Record<string, string>) {
-    await createDns({ hostname: values.hostname, ip: values.ip });
-    showToast("DNS entry created", "success");
+    const hostnames = values.hostnames
+      .split(/[\s,]+/)
+      .map((h) => h.trim())
+      .filter(Boolean);
+    if (hostnames.length === 1) {
+      await createDns({ hostname: hostnames[0], ip: values.ip });
+      showToast("DNS entry created", "success");
+    } else {
+      const created = await createDnsBulk(hostnames, values.ip);
+      showToast(`${created.length} DNS entries created`, "success");
+    }
     await load();
   }
 
@@ -130,7 +152,7 @@ export default function DnsTable() {
       {modalOpen && (
         <EntryModal
           title={editing ? "Edit DNS Entry" : "Add DNS Entry"}
-          fields={DNS_FIELDS}
+          fields={editing ? DNS_EDIT_FIELDS : DNS_ADD_FIELDS}
           initialValues={editing ? { hostname: editing.hostname, ip: editing.ip } : undefined}
           onSubmit={editing ? handleUpdate : handleCreate}
           onClose={() => setModalOpen(false)}

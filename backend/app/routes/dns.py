@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from ..config import DNSMASQ_CONF
-from ..models import DnsEntry
+from ..models import BulkDnsCreate, DnsEntry
 from ..parser import dns_id, load_all, write_config
 from .._restart import restart_dnsmasq
 
@@ -28,6 +28,29 @@ def create_dns(entry: DnsEntry):
     write_config(DNSMASQ_CONF, dns_entries, dhcp_leases, other_lines)
     restart_dnsmasq()
     return entry
+
+
+@router.post("/bulk", response_model=list[DnsEntry], status_code=201)
+def create_dns_bulk(payload: BulkDnsCreate):
+    dns_entries, dhcp_leases, other_lines = load_all(DNSMASQ_CONF)
+
+    created: list[DnsEntry] = []
+    for raw in payload.hostnames:
+        hostname = raw.strip()
+        if not hostname:
+            continue
+        entry = DnsEntry(hostname=hostname, ip=payload.ip, id=dns_id(hostname))
+        if any(e.id == entry.id for e in dns_entries):
+            raise HTTPException(status_code=409, detail=f"DNS entry for '{hostname}' already exists")
+        dns_entries.append(entry)
+        created.append(entry)
+
+    if not created:
+        raise HTTPException(status_code=422, detail="No valid hostnames provided")
+
+    write_config(DNSMASQ_CONF, dns_entries, dhcp_leases, other_lines)
+    restart_dnsmasq()
+    return created
 
 
 @router.put("/{entry_id}", response_model=DnsEntry)

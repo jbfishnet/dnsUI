@@ -41,6 +41,9 @@ export const updateDns = (id: string, entry: Omit<DnsEntry, "id">): Promise<DnsE
 export const deleteDns = (id: string): Promise<void> =>
   request<void>(`/api/dns/${id}`, { method: "DELETE" });
 
+export const createDnsBulk = (hostnames: string[], ip: string): Promise<DnsEntry[]> =>
+  request<DnsEntry[]>("/api/dns/bulk", { method: "POST", body: JSON.stringify({ hostnames, ip }) });
+
 // DHCP
 export const listDhcp = (): Promise<DhcpLease[]> =>
   request<DhcpLease[]>("/api/dhcp");

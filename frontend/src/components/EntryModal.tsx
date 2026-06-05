@@ -5,6 +5,8 @@ export interface FieldConfig {
   label: string;
   placeholder?: string;
   type?: string;
+  multiline?: boolean;  // render as textarea; value is newline/space-separated
+  hint?: string;        // small helper text shown below the field
 }
 
 interface Props {
@@ -85,17 +87,34 @@ export default function EntryModal({
               >
                 {field.label}
               </label>
-              <input
-                id={field.name}
-                type={field.type ?? "text"}
-                placeholder={field.placeholder}
-                value={values[field.name]}
-                onChange={(e) =>
-                  setValues((prev) => ({ ...prev, [field.name]: e.target.value }))
-                }
-                required
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              />
+              {field.multiline ? (
+                <textarea
+                  id={field.name}
+                  placeholder={field.placeholder}
+                  value={values[field.name]}
+                  onChange={(e) =>
+                    setValues((prev) => ({ ...prev, [field.name]: e.target.value }))
+                  }
+                  rows={3}
+                  required
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
+                />
+              ) : (
+                <input
+                  id={field.name}
+                  type={field.type ?? "text"}
+                  placeholder={field.placeholder}
+                  value={values[field.name]}
+                  onChange={(e) =>
+                    setValues((prev) => ({ ...prev, [field.name]: e.target.value }))
+                  }
+                  required
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              )}
+              {field.hint && (
+                <p className="mt-1 text-xs text-gray-400">{field.hint}</p>
+              )}
             </div>
           ))}
 

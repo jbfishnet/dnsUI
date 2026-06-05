@@ -67,6 +67,64 @@ def test_create_dns_duplicate_returns_409(conf_path):
 
 
 # ---------------------------------------------------------------------------
+# POST /api/dns/bulk
+# ---------------------------------------------------------------------------
+
+def test_bulk_create_dns_entries(conf_path):
+    payload = {"hostnames": ["producer.hamq.test", "consumer.hamq.test", "arbiter.hamq.test"], "ip": "192.168.1.22"}
+    resp = client.post("/api/dns/bulk", json=payload)
+    assert resp.status_code == 201
+    data = resp.json()
+    assert len(data) == 3
+    hostnames = {e["hostname"] for e in data}
+    assert hostnames == {"producer.hamq.test", "consumer.hamq.test", "arbiter.hamq.test"}
+    for entry in data:
+        assert entry["ip"] == "192.168.1.22"
+
+
+def test_bulk_create_persisted(conf_path):
+    client.post("/api/dns/bulk", json={"hostnames": ["a.test", "b.test"], "ip": "10.0.0.5"})
+    resp = client.get("/api/dns")
+    hostnames = {e["hostname"] for e in resp.json()}
+    assert "a.test" in hostnames
+    assert "b.test" in hostnames
+
+
+def test_bulk_create_single_hostname(conf_path):
+    resp = client.post("/api/dns/bulk", json={"hostnames": ["single.test"], "ip": "10.0.0.6"})
+    assert resp.status_code == 201
+    assert len(resp.json()) == 1
+
+
+def test_bulk_create_empty_hostnames_returns_422(conf_path):
+    resp = client.post("/api/dns/bulk", json={"hostnames": [], "ip": "10.0.0.1"})
+    assert resp.status_code == 422
+
+
+def test_bulk_create_skips_blank_entries(conf_path):
+    resp = client.post("/api/dns/bulk", json={"hostnames": ["valid.test", "", "  "], "ip": "10.0.0.7"})
+    assert resp.status_code == 201
+    assert len(resp.json()) == 1
+
+
+def test_bulk_create_duplicate_returns_409(conf_path):
+    resp = client.post("/api/dns/bulk", json={"hostnames": ["router.local", "new.local"], "ip": "10.0.0.1"})
+    assert resp.status_code == 409
+
+
+def test_bulk_create_preserves_dhcp_leases(conf_path):
+    client.post("/api/dns/bulk", json={"hostnames": ["x.test", "y.test"], "ip": "10.0.0.8"})
+    resp = client.get("/api/dhcp")
+    macs = {l["mac"] for l in resp.json()}
+    assert "aa:bb:cc:dd:ee:ff" in macs
+
+
+def test_bulk_create_generates_correct_ids(conf_path):
+    resp = client.post("/api/dns/bulk", json={"hostnames": ["my.host.test"], "ip": "10.0.0.9"})
+    assert resp.json()[0]["id"] == "my-host-test"
+
+
+# ---------------------------------------------------------------------------
 # PUT /api/dns/{id}
 # ---------------------------------------------------------------------------
 
